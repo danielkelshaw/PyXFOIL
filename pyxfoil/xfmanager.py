@@ -9,23 +9,25 @@ from .utils.exceptions import CommandListError, CommandNotRecognizedError, XFErr
 
 class BaseXFManager(abc.ABC):
 
-    def __init__(self, results_path: str = os.getcwd()):
+    def __init__(self, results_dir: str = os.getcwd()):
 
         """Base XFOIL Manager Class.
 
         Parameters
         ----------
-        results_path: str
+        results_dir: str
             Path to save results to.
         """
 
         self.process: Union[subprocess.Popen, None] = None
         self.cmd_list: List[str] = ['PLOP', 'G', '']
 
-        self.results_path: str = results_path
+        self.results_dir: str = results_dir
 
         self.stdout: Union[bytes, None] = None
         self.stderr: Union[bytes, None] = None
+
+        self._gen_path()
 
     def __del__(self) -> None:
 
@@ -33,6 +35,13 @@ class BaseXFManager(abc.ABC):
 
         if self.process is not None:
             self.process.kill()
+
+    def _gen_path(self) -> None:
+
+        """Generates `self.results_dir` if it doesn't exist."""
+
+        if not os.path.exists(self.results_dir):
+            os.makedirs(self.results_dir)
 
     @abc.abstractmethod
     def config_cmd(self, *args: Any) -> NoReturn:
@@ -106,7 +115,7 @@ class BaseXFManager(abc.ABC):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=self.results_path
+            cwd=self.results_dir
         )
 
         try:
