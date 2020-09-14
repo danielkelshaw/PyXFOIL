@@ -1,22 +1,31 @@
 import abc
 import os
+import re
 import subprocess
 from typing import Any, List, NoReturn, Union
 
-from .utils.exceptions import CommandListError, XFError
+from .utils.exceptions import CommandListError, CommandNotRecognizedError, XFError
 
 
 class BaseXFManager(abc.ABC):
 
-    def __init__(self, results_dir: str = os.getcwd()):
+    def __init__(self, results_path: str = os.getcwd()):
+
+        """Base XFOIL Manager Class.
+
+        Parameters
+        ----------
+        results_path: str
+            Path to save results to.
+        """
 
         self.process: Union[subprocess.Popen, None] = None
         self.cmd_list: List[str] = ['PLOP', 'G', '']
 
-        self.results_dir: str = results_dir
+        self.results_path: str = results_path
 
-        self.stdout: Union[str, None] = None
-        self.stderr: Union[str, None] = None
+        self.stdout: Union[bytes, None] = None
+        self.stderr: Union[bytes, None] = None
 
     def __del__(self) -> None:
 
@@ -62,6 +71,24 @@ class BaseXFManager(abc.ABC):
         if self.cmd_list[-2:] != ['', 'QUIT']:
             raise CommandListError("cmd_list must end with ['', 'QUIT']")
 
+    def _check_exit(self) -> None:
+
+        """Checks if XFOIL ran successfully.
+
+        Raises
+        ------
+        XFError
+            Raises if XFOIL exits with a non-zero returncode.
+        CommandNotRecognizedError
+            Raises if XFOIL was unable to recognise a command.
+        """
+
+        if self.process.returncode != 0:
+            raise XFError('XFOIL produced a non-zero returncode.')
+
+        if cnr_match := re.search('XFOIL\s+c>\s+(\S+)\s+command not recognized.', self.stdout.decode()):
+            raise CommandNotRecognizedError(f'{cnr_match.group(1)} command not recognized.')
+
     def run(self, timeout: float = 15.0) -> None:
 
         """Runs XFOIL Simulations.
@@ -79,7 +106,7 @@ class BaseXFManager(abc.ABC):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=self.results_dir
+            cwd=self.results_path
         )
 
         try:
@@ -87,5 +114,4 @@ class BaseXFManager(abc.ABC):
         except subprocess.TimeoutExpired as e:
             raise e
 
-        if self.process.returncode != 0:
-            raise XFError('XFOIL produced a non-zero returncode.')
+        self._check_exit()
