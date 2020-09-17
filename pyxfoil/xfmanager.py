@@ -1,13 +1,12 @@
-import abc
 import os
 import re
 import subprocess
-from typing import Any, List, NoReturn, Union
+from typing import Any, List, Union
 
 from .utils.exceptions import CommandListError, CommandNotRecognizedError, XFError
 
 
-class BaseXFManager(abc.ABC):
+class XFManager:
 
     def __init__(self, results_dir: str = os.getcwd()):
 
@@ -20,7 +19,9 @@ class BaseXFManager(abc.ABC):
         """
 
         self.process: Union[subprocess.Popen, None] = None
-        self.cmd_list: List[str] = ['PLOP', 'G', '']
+
+        self._cmd_list: Union[List[str], None] = None
+        self._cmds_set: bool = False
 
         self.results_dir: str = results_dir
 
@@ -28,6 +29,15 @@ class BaseXFManager(abc.ABC):
         self.stderr: Union[bytes, None] = None
 
         self._gen_path()
+
+    @property
+    def cmd_list(self) -> List[str]:
+        return self._cmd_list
+
+    @cmd_list.setter
+    def cmd_list(self, cmds: List[Any]) -> None:
+        self._cmd_list = list(map(str, cmds))
+        self._cmds_set = True
 
     def __del__(self) -> None:
 
@@ -38,32 +48,22 @@ class BaseXFManager(abc.ABC):
 
     def _gen_path(self) -> None:
 
-        """Generates `self.results_dir` if it doesn't exist."""
+        """Generates `self.results_dir` if it doesn't exist.    """
 
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir)
 
-    @abc.abstractmethod
-    def config_cmd(self, *args: Any) -> NoReturn:
+    def config_cmd(self, cmds: List[Any]) -> None:
 
         """Configures commands sent to XFOIL.
 
-        The user must override this method to add the relevant commands
-        to `self.cmd_list` - there will be a check to ensure that XFOIL
-        runs without a display and exits at the end of the run.
-
         Parameters
         ----------
-        *args : Any
+        cmds : List[Any]
             Any parameters that the user wishes to provide.
-
-        Raises
-        ------
-        NotImplementedError
-            BaseXFManager::config_cmd()
         """
 
-        raise NotImplementedError('BaseXFManager::config_cmd()')
+        self.cmd_list = cmds
 
     def _check_commands(self) -> None:
 
@@ -74,7 +74,8 @@ class BaseXFManager(abc.ABC):
         CommandListError
             Ensures that `self.cmd_list` starts / ends appropriately.
         """
-
+        if not self._cmds_set:
+            raise CommandListError('Must provide a cmd_list')
         if self.cmd_list[:3] != ['PLOP', 'G', '']:
             raise CommandListError("cmd_list must begin with ['PLOP', 'G', '']")
         if self.cmd_list[-2:] != ['', 'QUIT']:
@@ -119,7 +120,7 @@ class BaseXFManager(abc.ABC):
         )
 
         try:
-            self.stdout, self.stderr = self.process.communicate('\n'.join(self.cmd_list).encode(), timeout=timeout)
+            self.stdout, self.stderr = self.process.communicate('\n'.join(self._cmd_list).encode(), timeout=timeout)
         except subprocess.TimeoutExpired as e:
             raise e
 
