@@ -5,6 +5,15 @@ Basic Python wrapper for XFOIL.
 - [x] MIT License
 - [x] Python 3.8+
 
+**XFOIL Usage:**
+In order for this code to work `XFOIL` must be in the user's `PATH`.
+
+An easy way to run the code is through a Docker container, for example:
+
+```bash
+$ docker pull danielkelshaw/xfoil
+```
+
 **Example Usage:**
 
 ```python
